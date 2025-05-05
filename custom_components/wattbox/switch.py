@@ -2,12 +2,14 @@
 
 import logging
 from typing import Final, List
+from asyncio import TimeoutError, wait_for
 
 from homeassistant.components.switch import SwitchDeviceClass, SwitchEntity
 from homeassistant.const import CONF_NAME
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
+from homeassistant.exceptions import PlatformNotReady
 
 from .const import DOMAIN_DATA, PLUG_ICON
 from .entity import WattBoxEntity
@@ -22,16 +24,19 @@ async def async_setup_platform(  # pylint: disable=unused-argument
     discovery_info: DiscoveryInfoType,
 ) -> None:
     """Setup switch platform."""
-    name: str = discovery_info[CONF_NAME]
-    entities: List[WattBoxEntity] = []
+    try:
+        name: str = discovery_info[CONF_NAME]
+        entities: List[WattBoxEntity] = []
 
-    num_switches: int = hass.data[DOMAIN_DATA][name].number_outlets
+        num_switches: int = hass.data[DOMAIN_DATA][name].number_outlets
 
-    entities.append(WattBoxMasterSwitch(hass, name))
-    for i in range(1, num_switches + 1):
-        entities.append(WattBoxBinarySwitch(hass, name, i))
+        entities.append(WattBoxMasterSwitch(hass, name))
+        for i in range(1, num_switches + 1):
+            entities.append(WattBoxBinarySwitch(hass, name, i))
 
-    async_add_entities(entities, True)
+        await async_add_entities(entities, True)
+    except TimeoutError:
+        raise PlatformNotReady
 
 
 class WattBoxBinarySwitch(WattBoxEntity, SwitchEntity):

@@ -2,11 +2,13 @@
 
 import logging
 from typing import List
+from asyncio import TimeoutError, wait_for
 
 from homeassistant.const import CONF_NAME, CONF_RESOURCES, STATE_UNKNOWN
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
+from homeassistant.exceptions import PlatformNotReady
 
 from .const import DOMAIN_DATA, SENSOR_TYPES
 from .entity import WattBoxEntity
@@ -21,18 +23,21 @@ async def async_setup_platform(  # pylint: disable=unused-argument
     discovery_info: DiscoveryInfoType,
 ) -> None:
     """Setup sensor platform."""
-    name: str = discovery_info[CONF_NAME]
-    entities: List[WattBoxSensor] = []
+    try:
+        name: str = discovery_info[CONF_NAME]
+        entities: List[WattBoxSensor] = []
 
-    for resource in discovery_info[CONF_RESOURCES]:
-        sensor_type = resource.lower()
+        for resource in discovery_info[CONF_RESOURCES]:
+            sensor_type = resource.lower()
 
-        if sensor_type not in SENSOR_TYPES:
-            continue
+            if sensor_type not in SENSOR_TYPES:
+                continue
 
-        entities.append(WattBoxSensor(hass, name, sensor_type))
+            entities.append(WattBoxSensor(hass, name, sensor_type))
 
-    async_add_entities(entities, True)
+        await async_add_entities(entities, True)
+    except TimeoutError:
+        raise PlatformNotReady
 
 
 class WattBoxSensor(WattBoxEntity):
