@@ -26,7 +26,7 @@ from homeassistant.exceptions import PlatformNotReady
 from homeassistant.helpers import discovery
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.event import async_track_time_interval
-from homeassistant.helpers.typing import ConfigType
+from homeassistant.helpers.typing import ConfigType, HomeAssistantType
 from pywattbox.base import BaseWattBox
 
 from .const import (
@@ -152,3 +152,53 @@ async def update_data(_dt: datetime, hass: HomeAssistant, name: str) -> None:
         async_dispatcher_send(hass, TOPIC_UPDATE.format(DOMAIN, name))
     except Exception as error:
         _LOGGER.error("Could not update data - %s", error)
+
+
+async def async_setup_entry(hass: HomeAssistantType, entry: ConfigEntry) -> bool:
+    """Set up WattBox from a config entry."""
+    hass.data.setdefault(DOMAIN_DATA, {})
+
+    config = entry.data
+    host = config[CONF_HOST]
+    password = config[CONF_PASSWORD]
+    port = config[CONF_PORT]
+    username = config[CONF_USERNAME]
+    name = config[CONF_NAME]
+
+    try:
+        if port in (22, 23):
+            from pywattbox.ip_wattbox import async_create_ip_wattbox
+            wattbox = await async_create_ip_wattbox(
+                host=host, user=username, password=password, port=port
+            )
+        else:
+            from pywattbox.http_wattbox import async_create_http_wattbox
+            wattbox = await async_create_http_wattbox(
+                host=host, user=username, password=password, port=port
+            )
+    except Exception as error:
+        _LOGGER.error("Error creating WattBox instance: %s", error)
+        raise PlatformNotReady from error
+
+    hass.data[DOMAIN_DATA][name] = wattbox
+
+    for platform in PLATFORMS:
+        hass.async_create_task(
+            discovery.async_load_platform(hass, platform, DOMAIN, config, entry.options)
+        )
+
+    scan_interval = config.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
+    async_track_time_interval(
+        hass, partial(update_data, hass=hass, name=name), scan_interval
+    )
+
+    return True
+
+
+async def async_unload_entry(hass: HomeAssistantType, entry: ConfigEntry) -> bool:
+    """Unload a config entry."""
+    name = entry.data[CONF_NAME]
+    if name in hass.data[DOMAIN_DATA]:
+        hass.data[DOMAIN_DATA].pop(name)
+
+    return await hass.config_entries.async_forward_entry_unload(entry, PLATFORMS)
