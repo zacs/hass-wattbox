@@ -1,7 +1,7 @@
 """Binary sensor platform for wattbox."""
 
 import logging
-from asyncio import TimeoutError, wait_for
+from asyncio import TimeoutError
 
 from homeassistant.components.binary_sensor import BinarySensorEntity
 from homeassistant.const import CONF_NAME, CONF_RESOURCES
@@ -53,7 +53,7 @@ class WattBoxBinarySensor(WattBoxEntity, BinarySensorEntity):
     async def async_update(self) -> None:
         """Update the sensor."""
         # Get domain data
-        wattbox = self.hass.data[DOMAIN_DATA][self.wattbox_name]
+        wattbox = self.hass.data[DOMAIN_DATA][self.wattbox_name]["wattbox"]
 
         # Check the data and update the value.
         value: bool | None = getattr(wattbox, self.type)

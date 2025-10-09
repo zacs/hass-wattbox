@@ -2,7 +2,7 @@
 
 import logging
 from typing import List
-from asyncio import TimeoutError, wait_for
+from asyncio import TimeoutError
 
 from homeassistant.const import CONF_NAME, CONF_RESOURCES, STATE_UNKNOWN
 from homeassistant.core import HomeAssistant
@@ -53,7 +53,7 @@ class WattBoxSensor(WattBoxEntity):
     async def async_update(self) -> None:
         """Update the sensor."""
         # Get new data (if any)
-        wattbox = self.hass.data[DOMAIN_DATA][self.wattbox_name]
+        wattbox = self.hass.data[DOMAIN_DATA][self.wattbox_name]["wattbox"]
 
         # Check the data and update the value.
         self._attr_state = getattr(wattbox, self.sensor_type, STATE_UNKNOWN)

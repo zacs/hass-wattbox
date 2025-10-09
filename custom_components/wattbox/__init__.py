@@ -43,7 +43,7 @@ from .const import (
     TOPIC_UPDATE,
 )
 
-REQUIREMENTS: Final[List[str]] = ["pywattbox>=0.4.0,<0.7.0"]
+REQUIREMENTS: Final[List[str]] = ["pywattbox>=0.4.0,<0.7.0", "getmac>=0.9.0"]
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -94,9 +94,11 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         username = wattbox_host.get(CONF_USERNAME)
         name = wattbox_host.get(CONF_NAME)
 
-        hass.data[DOMAIN_DATA][name] = await hass.async_add_executor_job(
+        wattbox = await hass.async_add_executor_job(
             WattBox, host, port, username, password
         )
+        # Store both the wattbox object and host IP for device registry
+        hass.data[DOMAIN_DATA][name] = {"wattbox": wattbox, "host": host}
 
         # Load platforms
         for platform in PLATFORMS:
@@ -113,9 +115,10 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         )
 
     # Extra logging to ensure the right outlets are set up.
-    _LOGGER.debug(", ".join([str(v) for _, v in hass.data[DOMAIN_DATA].items()]))
+    _LOGGER.debug(", ".join([str(v["wattbox"]) for _, v in hass.data[DOMAIN_DATA].items()]))
     _LOGGER.debug(repr(hass.data[DOMAIN_DATA]))
-    for _, wattbox in hass.data[DOMAIN_DATA].items():
+    for _, data in hass.data[DOMAIN_DATA].items():
+        wattbox = data["wattbox"]
         _LOGGER.debug("%s has %s outlets", wattbox, len(wattbox.outlets))
         for outlet in wattbox.outlets:
             _LOGGER.debug("Outlet: %s - %s", outlet, repr(outlet))
@@ -128,11 +131,12 @@ async def update_data(_: datetime, hass: HomeAssistant, name: str) -> None:
 
     # This is where the main logic to update platform data goes.
     try:
-        await hass.async_add_executor_job(hass.data[DOMAIN_DATA][name].update)
+        wattbox = hass.data[DOMAIN_DATA][name]["wattbox"]
+        await hass.async_add_executor_job(wattbox.update)
         _LOGGER.debug(
             "Updated: %s - %s",
-            hass.data[DOMAIN_DATA][name],
-            repr(hass.data[DOMAIN_DATA][name]),
+            wattbox,
+            repr(wattbox),
         )
         # Send update to topic for entities to see
         async_dispatcher_send(hass, TOPIC_UPDATE.format(DOMAIN, name))

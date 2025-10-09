@@ -2,7 +2,7 @@
 
 import logging
 from typing import Final, List
-from asyncio import TimeoutError, wait_for
+from asyncio import TimeoutError
 
 from homeassistant.components.switch import SwitchDeviceClass, SwitchEntity
 from homeassistant.const import CONF_NAME
@@ -28,7 +28,7 @@ async def async_setup_platform(  # pylint: disable=unused-argument
         name: str = discovery_info[CONF_NAME]
         entities: List[WattBoxEntity] = []
 
-        num_switches: int = hass.data[DOMAIN_DATA][name].number_outlets
+        num_switches: int = hass.data[DOMAIN_DATA][name]["wattbox"].number_outlets
 
         entities.append(WattBoxMasterSwitch(hass, name))
         for i in range(1, num_switches + 1):
@@ -52,7 +52,7 @@ class WattBoxBinarySwitch(WattBoxEntity, SwitchEntity):
     async def async_update(self):
         """Update the sensor."""
         # Get new data (if any)
-        outlet = self.hass.data[DOMAIN_DATA][self.wattbox_name].outlets[self.index]
+        outlet = self.hass.data[DOMAIN_DATA][self.wattbox_name]["wattbox"].outlets[self.index]
 
         # Check the data and update the value.
         self._attr_is_on = outlet.status
@@ -64,42 +64,44 @@ class WattBoxBinarySwitch(WattBoxEntity, SwitchEntity):
 
     async def async_turn_on(self, **kwargs) -> None:  # pylint: disable=unused-argument
         """Turn on the switch."""
+        wattbox = self.hass.data[DOMAIN_DATA][self.wattbox_name]["wattbox"]
         _LOGGER.debug(
             "Turning On: %s - %s",
-            self.hass.data[DOMAIN_DATA][self.wattbox_name],
-            self.hass.data[DOMAIN_DATA][self.wattbox_name].outlets[self.index],
+            wattbox,
+            wattbox.outlets[self.index],
         )
         _LOGGER.debug(
             "Current Outlet Before: %s - %s",
-            self.hass.data[DOMAIN_DATA][self.wattbox_name].outlets[self.index].status,
-            repr(self.hass.data[DOMAIN_DATA][self.wattbox_name].outlets[self.index]),
+            wattbox.outlets[self.index].status,
+            repr(wattbox.outlets[self.index]),
         )
         # Update state first so it is not stale.
         self._attr_is_on = True
         self.async_write_ha_state()
         # Trigger the action on the wattbox.
         await self.hass.async_add_executor_job(
-            self.hass.data[DOMAIN_DATA][self.wattbox_name].outlets[self.index].turn_on
+            wattbox.outlets[self.index].turn_on
         )
 
     async def async_turn_off(self, **kwargs) -> None:  # pylint: disable=unused-argument
         """Turn off the switch."""
+        wattbox = self.hass.data[DOMAIN_DATA][self.wattbox_name]["wattbox"]
         _LOGGER.debug(
             "Turning Off: %s - %s",
-            self.hass.data[DOMAIN_DATA][self.wattbox_name],
-            self.hass.data[DOMAIN_DATA][self.wattbox_name].outlets[self.index],
+            wattbox,
+            wattbox.outlets[self.index],
         )
         _LOGGER.debug(
             "Current Outlet Before: %s - %s",
-            self.hass.data[DOMAIN_DATA][self.wattbox_name].outlets[self.index].status,
-            repr(self.hass.data[DOMAIN_DATA][self.wattbox_name].outlets[self.index]),
+            wattbox.outlets[self.index].status,
+            repr(wattbox.outlets[self.index]),
         )
         # Update state first so it is not stale.
         self._attr_is_on = False
         self.async_write_ha_state()
         # Trigger the action on the wattbox.
         await self.hass.async_add_executor_job(
-            self.hass.data[DOMAIN_DATA][self.wattbox_name].outlets[self.index].turn_off
+            wattbox.outlets[self.index].turn_off
         )
 
     @property
